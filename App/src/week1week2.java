@@ -2,99 +2,98 @@ import java.util.*;
 
 class week1week2{
 
-    static class Slot{
-        String plate;
-        long entryTime;
-        boolean occupied;
+    static class Transaction{
+        int id,amount;
+        String merchant,time,account;
 
-        Slot(){
-            plate=null;
-            occupied=false;
+        Transaction(int i,int a,String m,String t,String acc){
+            id=i;amount=a;merchant=m;time=t;account=acc;
         }
     }
 
-    static class ParkingLot{
+    static class SystemDS{
 
-        Slot[] table;
-        int size;
-        int occupiedCount=0;
-        int totalProbes=0;
+        List<Transaction> list=new ArrayList<>();
 
-        ParkingLot(int n){
-            size=n;
-            table=new Slot[n];
-            for(int i=0;i<n;i++)table[i]=new Slot();
+        void add(Transaction t){
+            list.add(t);
         }
 
-        // hash function
-        int hash(String plate){
-            return Math.abs(plate.hashCode())%size;
-        }
+        // classic two sum
+        void twoSum(int target){
+            Map<Integer,Transaction> map=new HashMap<>();
 
-        // park vehicle
-        void park(String plate){
-            int index=hash(plate);
-            int probes=0;
-
-            while(table[index].occupied){
-                index=(index+1)%size;
-                probes++;
-            }
-
-            table[index].plate=plate;
-            table[index].occupied=true;
-            table[index].entryTime=System.currentTimeMillis();
-
-            occupiedCount++;
-            totalProbes+=probes;
-
-            System.out.println("Assigned spot #"+index+" ("+probes+" probes)");
-        }
-
-        // exit vehicle
-        void exit(String plate){
-            int index=hash(plate);
-
-            while(table[index].occupied){
-                if(table[index].plate.equals(plate)){
-                    long duration=(System.currentTimeMillis()-table[index].entryTime)/1000;
-                    table[index].occupied=false;
-                    table[index].plate=null;
-                    occupiedCount--;
-
-                    double fee=duration*0.01;
-
-                    System.out.println("Spot #"+index+" freed. Duration: "+duration+"s Fee: $"+fee);
-                    return;
+            for(Transaction t:list){
+                int comp=target-t.amount;
+                if(map.containsKey(comp)){
+                    System.out.println("Pair: "+map.get(comp).id+" , "+t.id);
                 }
-                index=(index+1)%size;
+                map.put(t.amount,t);
             }
-
-            System.out.println("Vehicle not found");
         }
 
-        // stats
-        void stats(){
-            double occupancy=(occupiedCount*100.0)/size;
-            double avgProbes=occupiedCount==0?0:(totalProbes*1.0/occupiedCount);
+        // duplicate detection
+        void duplicates(){
+            Map<String,List<Transaction>> map=new HashMap<>();
 
-            System.out.println("Occupancy: "+occupancy+"%");
-            System.out.println("Avg Probes: "+avgProbes);
+            for(Transaction t:list){
+                String key=t.amount+"-"+t.merchant;
+                map.putIfAbsent(key,new ArrayList<>());
+                map.get(key).add(t);
+            }
+
+            for(String k:map.keySet()){
+                List<Transaction> l=map.get(k);
+                if(l.size()>1){
+                    System.out.print("Duplicate: ");
+                    for(Transaction t:l){
+                        System.out.print(t.id+" ");
+                    }
+                    System.out.println();
+                }
+            }
+        }
+
+        // k-sum (simple recursion)
+        void kSum(int k,int target){
+            findK(0,k,target,new ArrayList<>());
+        }
+
+        void findK(int index,int k,int target,List<Integer> res){
+            if(k==0&&target==0){
+                System.out.println(res);
+                return;
+            }
+            if(index>=list.size()||k<0||target<0)return;
+
+            Transaction t=list.get(index);
+
+// include
+            res.add(t.id);
+            findK(index+1,k-1,target-t.amount,res);
+
+// exclude
+            res.remove(res.size()-1);
+            findK(index+1,k,target,res);
         }
     }
 
-    public static void main(String[] args)throws Exception{
+    public static void main(String[] args){
 
-        ParkingLot pl=new ParkingLot(10);
+        SystemDS ds=new SystemDS();
 
-        pl.park("ABC1234");
-        pl.park("ABC1235");
-        pl.park("XYZ9999");
+        ds.add(new Transaction(1,500,"StoreA","10:00","acc1"));
+        ds.add(new Transaction(2,300,"StoreB","10:15","acc2"));
+        ds.add(new Transaction(3,200,"StoreC","10:30","acc3"));
+        ds.add(new Transaction(4,500,"StoreA","11:00","acc4"));
 
-        Thread.sleep(2000);
+// two sum
+        ds.twoSum(500);
 
-        pl.exit("ABC1234");
+// duplicates
+        ds.duplicates();
 
-        pl.stats();
+// k sum
+        ds.kSum(3,1000);
     }
 }
