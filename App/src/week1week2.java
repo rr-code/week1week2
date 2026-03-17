@@ -2,62 +2,99 @@ import java.util.*;
 
 class week1week2{
 
-    static class Autocomplete{
+    static class Slot{
+        String plate;
+        long entryTime;
+        boolean occupied;
 
-        Map<String,Integer> freq=new HashMap<>();
-
-        // update frequency
-        void update(String query){
-            freq.put(query,freq.getOrDefault(query,0)+1);
-        }
-
-        // search top k suggestions
-        List<String> search(String prefix,int k){
-
-            PriorityQueue<String> pq=new PriorityQueue<>(
-                    (a,b)->{
-                        if(freq.get(a)==freq.get(b)){
-                            return b.compareTo(a);
-                        }
-                        return freq.get(a)-freq.get(b);
-                    }
-            );
-
-            for(String q:freq.keySet()){
-                if(q.startsWith(prefix)){
-                    pq.add(q);
-                    if(pq.size()>k){
-                        pq.poll();
-                    }
-                }
-            }
-
-            List<String> res=new ArrayList<>();
-            while(!pq.isEmpty()){
-                res.add(pq.poll());
-            }
-            Collections.reverse(res);
-            return res;
+        Slot(){
+            plate=null;
+            occupied=false;
         }
     }
 
-    public static void main(String[] args){
+    static class ParkingLot{
 
-        Autocomplete ac=new Autocomplete();
+        Slot[] table;
+        int size;
+        int occupiedCount=0;
+        int totalProbes=0;
 
-// add queries
-        ac.update("java tutorial");
-        ac.update("java tutorial");
-        ac.update("javascript guide");
-        ac.update("java download");
-        ac.update("java download");
-        ac.update("java download");
-
-// search
-        List<String> result=ac.search("jav",3);
-
-        for(String s:result){
-            System.out.println(s+" ("+ac.freq.get(s)+")");
+        ParkingLot(int n){
+            size=n;
+            table=new Slot[n];
+            for(int i=0;i<n;i++)table[i]=new Slot();
         }
+
+        // hash function
+        int hash(String plate){
+            return Math.abs(plate.hashCode())%size;
+        }
+
+        // park vehicle
+        void park(String plate){
+            int index=hash(plate);
+            int probes=0;
+
+            while(table[index].occupied){
+                index=(index+1)%size;
+                probes++;
+            }
+
+            table[index].plate=plate;
+            table[index].occupied=true;
+            table[index].entryTime=System.currentTimeMillis();
+
+            occupiedCount++;
+            totalProbes+=probes;
+
+            System.out.println("Assigned spot #"+index+" ("+probes+" probes)");
+        }
+
+        // exit vehicle
+        void exit(String plate){
+            int index=hash(plate);
+
+            while(table[index].occupied){
+                if(table[index].plate.equals(plate)){
+                    long duration=(System.currentTimeMillis()-table[index].entryTime)/1000;
+                    table[index].occupied=false;
+                    table[index].plate=null;
+                    occupiedCount--;
+
+                    double fee=duration*0.01;
+
+                    System.out.println("Spot #"+index+" freed. Duration: "+duration+"s Fee: $"+fee);
+                    return;
+                }
+                index=(index+1)%size;
+            }
+
+            System.out.println("Vehicle not found");
+        }
+
+        // stats
+        void stats(){
+            double occupancy=(occupiedCount*100.0)/size;
+            double avgProbes=occupiedCount==0?0:(totalProbes*1.0/occupiedCount);
+
+            System.out.println("Occupancy: "+occupancy+"%");
+            System.out.println("Avg Probes: "+avgProbes);
+        }
+    }
+
+    public static void main(String[] args)throws Exception{
+
+        ParkingLot pl=new ParkingLot(10);
+
+        pl.park("ABC1234");
+        pl.park("ABC1235");
+        pl.park("XYZ9999");
+
+        Thread.sleep(2000);
+
+        pl.exit("ABC1234");
+
+        pl.stats();
     }
 }
