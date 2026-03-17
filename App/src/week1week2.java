@@ -2,98 +2,90 @@ import java.util.*;
 
 class week1week2{
 
-    static class Transaction{
-        int id,amount;
-        String merchant,time,account;
+    static class Cache{
 
-        Transaction(int i,int a,String m,String t,String acc){
-            id=i;amount=a;merchant=m;time=t;account=acc;
-        }
-    }
-
-    static class SystemDS{
-
-        List<Transaction> list=new ArrayList<>();
-
-        void add(Transaction t){
-            list.add(t);
-        }
-
-        // classic two sum
-        void twoSum(int target){
-            Map<Integer,Transaction> map=new HashMap<>();
-
-            for(Transaction t:list){
-                int comp=target-t.amount;
-                if(map.containsKey(comp)){
-                    System.out.println("Pair: "+map.get(comp).id+" , "+t.id);
-                }
-                map.put(t.amount,t);
+        // L1 (LRU using LinkedHashMap)
+        LinkedHashMap<String,String> L1=new LinkedHashMap<>(100,0.75f,true){
+            protected boolean removeEldestEntry(Map.Entry<String,String> e){
+                return size()>3;
             }
-        }
+        };
 
-        // duplicate detection
-        void duplicates(){
-            Map<String,List<Transaction>> map=new HashMap<>();
+        // L2
+        HashMap<String,String> L2=new HashMap<>();
 
-            for(Transaction t:list){
-                String key=t.amount+"-"+t.merchant;
-                map.putIfAbsent(key,new ArrayList<>());
-                map.get(key).add(t);
-            }
+        // L3 (database)
+        HashMap<String,String> L3=new HashMap<>();
 
-            for(String k:map.keySet()){
-                List<Transaction> l=map.get(k);
-                if(l.size()>1){
-                    System.out.print("Duplicate: ");
-                    for(Transaction t:l){
-                        System.out.print(t.id+" ");
-                    }
-                    System.out.println();
-                }
-            }
-        }
+        Map<String,Integer> accessCount=new HashMap<>();
 
-        // k-sum (simple recursion)
-        void kSum(int k,int target){
-            findK(0,k,target,new ArrayList<>());
-        }
+        int l1Hit=0,l2Hit=0,l3Hit=0,total=0;
 
-        void findK(int index,int k,int target,List<Integer> res){
-            if(k==0&&target==0){
-                System.out.println(res);
+        // get video
+        void get(String id){
+            total++;
+
+// L1
+            if(L1.containsKey(id)){
+                l1Hit++;
+                System.out.println("L1 HIT -> "+id);
                 return;
             }
-            if(index>=list.size()||k<0||target<0)return;
 
-            Transaction t=list.get(index);
+// L2
+            if(L2.containsKey(id)){
+                l2Hit++;
+                System.out.println("L2 HIT -> "+id);
 
-// include
-            res.add(t.id);
-            findK(index+1,k-1,target-t.amount,res);
+// promote to L1
+                L1.put(id,L2.get(id));
+                return;
+            }
 
-// exclude
-            res.remove(res.size()-1);
-            findK(index+1,k,target,res);
+// L3
+            if(L3.containsKey(id)){
+                l3Hit++;
+                System.out.println("L3 HIT -> "+id);
+
+// add to L2
+                L2.put(id,L3.get(id));
+                accessCount.put(id,accessCount.getOrDefault(id,0)+1);
+
+// promote if frequent
+                if(accessCount.get(id)>1){
+                    L1.put(id,L3.get(id));
+                }
+                return;
+            }
+
+            System.out.println("MISS -> "+id);
+        }
+
+        // stats
+        void stats(){
+            System.out.println("L1 Hit Rate: "+(l1Hit*100.0/total)+"%");
+            System.out.println("L2 Hit Rate: "+(l2Hit*100.0/total)+"%");
+            System.out.println("L3 Hit Rate: "+(l3Hit*100.0/total)+"%");
         }
     }
 
     public static void main(String[] args){
 
-        SystemDS ds=new SystemDS();
+        Cache c=new Cache();
 
-        ds.add(new Transaction(1,500,"StoreA","10:00","acc1"));
-        ds.add(new Transaction(2,300,"StoreB","10:15","acc2"));
-        ds.add(new Transaction(3,200,"StoreC","10:30","acc3"));
-        ds.add(new Transaction(4,500,"StoreA","11:00","acc4"));
+// preload database
+        c.L3.put("video1","data1");
+        c.L3.put("video2","data2");
+        c.L3.put("video3","data3");
 
-// two sum
-        ds.twoSum(500);
+// access pattern
+        c.get("video1");
+        c.get("video1");
+        c.get("video2");
+        c.get("video1");
+        c.get("video3");
+        c.get("video1");
 
-// duplicates
-        ds.duplicates();
-
-// k sum
-        ds.kSum(3,1000);
+        c.stats();
     }
 }
