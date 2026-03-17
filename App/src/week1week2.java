@@ -1,95 +1,73 @@
 import java.util.*;
 
-class week1week2{
+public class week1week2{
 
-    static class Entry{
-        String domain;
-        String ip;
-        long expiry;
-        Entry(String d,String i,long ttl){
-            domain=d;
-            ip=i;
-            expiry=System.currentTimeMillis()+ttl*1000;
-        }
-    }
+    static class PlagiarismDetector{
 
-    static class DNSCache{
-        int capacity;
-        Map<String,Entry> map;
-        LinkedList<String> lru;
-        int hits=0,miss=0;
+        int N=3; // n-gram size
+        Map<String,Set<String>> index=new HashMap<>();
 
-        DNSCache(int cap){
-            capacity=cap;
-            map=new HashMap<>();
-            lru=new LinkedList<>();
+        // Generate n-grams
+        List<String> getNGrams(String text){
+            List<String> grams=new ArrayList<>();
+            String[] words=text.toLowerCase().split("\\s+");
+            for(int i=0;i<=words.length-N;i++){
+                StringBuilder sb=new StringBuilder();
+                for(int j=0;j<N;j++){
+                    sb.append(words[i+j]).append(" ");
+                }
+                grams.add(sb.toString().trim());
+            }
+            return grams;
         }
 
-        String resolve(String domain){
-            long now=System.currentTimeMillis();
-            if(map.containsKey(domain)){
-                Entry e=map.get(domain);
-                if(e.expiry>now){
-                    hits++;
-                    lru.remove(domain);
-                    lru.addFirst(domain);
-                    return "Cache HIT -> "+e.ip;
-                }else{
-                    map.remove(domain);
-                    lru.remove(domain);
+        // Add document to database
+        void addDocument(String docId,String text){
+            List<String> grams=getNGrams(text);
+            for(String g:grams){
+                index.putIfAbsent(g,new HashSet<>());
+                index.get(g).add(docId);
+            }
+        }
+
+        // Analyze document
+        void analyze(String docId,String text){
+            List<String> grams=getNGrams(text);
+            Map<String,Integer> matchCount=new HashMap<>();
+
+            for(String g:grams){
+                if(index.containsKey(g)){
+                    for(String d:index.get(g)){
+                        matchCount.put(d,matchCount.getOrDefault(d,0)+1);
+                    }
                 }
             }
-            miss++;
-            String ip=queryUpstream(domain);
-            put(domain,ip,5); //TTL=5s example
-            return "Cache MISS -> "+ip;
-        }
 
-        void put(String domain,String ip,int ttl){
-            if(map.size()>=capacity){
-                String last=lru.removeLast();
-                map.remove(last);
-            }
-            Entry e=new Entry(domain,ip,ttl);
-            map.put(domain,e);
-            lru.addFirst(domain);
-        }
+            System.out.println("Total n-grams: "+grams.size());
 
-        String queryUpstream(String domain){
-            Random r=new Random();
-            return "172.217.14."+r.nextInt(255);
-        }
-
-        void clean(){
-            long now=System.currentTimeMillis();
-            Iterator<String> it=lru.iterator();
-            while(it.hasNext()){
-                String d=it.next();
-                if(map.get(d).expiry<=now){
-                    it.remove();
-                    map.remove(d);
+            for(String d:matchCount.keySet()){
+                int matches=matchCount.get(d);
+                double similarity=(matches*100.0)/grams.size();
+                System.out.println("Matched with "+d+" -> "+matches+" n-grams");
+                System.out.println("Similarity: "+similarity+"%");
+                if(similarity>50){
+                    System.out.println("PLAGIARISM DETECTED");
                 }
             }
         }
-
-        void stats(){
-            int total=hits+miss;
-            double rate=total==0?0:(hits*100.0/total);
-            System.out.println("Hit Rate: "+rate+"%");
-        }
     }
 
-    public static void main(String[] args)throws Exception{
-        DNSCache cache=new DNSCache(3);
+    public static void main(String[] args){
 
-        System.out.println(cache.resolve("google.com"));
-        Thread.sleep(1000);
-        System.out.println(cache.resolve("google.com"));
+        PlagiarismDetector pd=new PlagiarismDetector();
 
-        Thread.sleep(6000);
-        cache.clean();
-        System.out.println(cache.resolve("google.com"));
+// Existing documents
+        pd.addDocument("essay_089","data structures and algorithms are important for coding");
+        pd.addDocument("essay_092","java programming language is widely used in software development");
 
-        cache.stats();
+// New document
+        String newDoc="data structures and algorithms are widely used in programming";
+
+        pd.analyze("essay_123",newDoc);
     }
-}
+}}
