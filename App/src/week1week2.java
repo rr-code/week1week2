@@ -2,89 +2,62 @@ import java.util.*;
 
 class week1week2{
 
-    static class TokenBucket{
-        int tokens;
-        int maxTokens;
-        long lastRefill;
-        int refillRate; // tokens per second
+    static class Autocomplete{
 
-        TokenBucket(int max,int rate){
-            maxTokens=max;
-            tokens=max;
-            refillRate=rate;
-            lastRefill=System.currentTimeMillis();
+        Map<String,Integer> freq=new HashMap<>();
+
+        // update frequency
+        void update(String query){
+            freq.put(query,freq.getOrDefault(query,0)+1);
         }
 
-        // refill tokens
-        void refill(){
-            long now=System.currentTimeMillis();
-            long seconds=(now-lastRefill)/1000;
-            int add=(int)(seconds*refillRate);
+        // search top k suggestions
+        List<String> search(String prefix,int k){
 
-            if(add>0){
-                tokens=Math.min(maxTokens,tokens+add);
-                lastRefill=now;
-            }
-        }
+            PriorityQueue<String> pq=new PriorityQueue<>(
+                    (a,b)->{
+                        if(freq.get(a)==freq.get(b)){
+                            return b.compareTo(a);
+                        }
+                        return freq.get(a)-freq.get(b);
+                    }
+            );
 
-        // allow request
-        boolean allow(){
-            refill();
-            if(tokens>0){
-                tokens--;
-                return true;
+            for(String q:freq.keySet()){
+                if(q.startsWith(prefix)){
+                    pq.add(q);
+                    if(pq.size()>k){
+                        pq.poll();
+                    }
+                }
             }
-            return false;
+
+            List<String> res=new ArrayList<>();
+            while(!pq.isEmpty()){
+                res.add(pq.poll());
+            }
+            Collections.reverse(res);
+            return res;
         }
     }
 
-    static class RateLimiter{
+    public static void main(String[] args){
 
-        Map<String,TokenBucket> map=new HashMap<>();
-        int maxTokens=1000;
-        int refillRate=1000/3600; // per second
+        Autocomplete ac=new Autocomplete();
 
-        // check limit
-        void check(String clientId){
+// add queries
+        ac.update("java tutorial");
+        ac.update("java tutorial");
+        ac.update("javascript guide");
+        ac.update("java download");
+        ac.update("java download");
+        ac.update("java download");
 
-            map.putIfAbsent(clientId,new TokenBucket(maxTokens,refillRate));
-            TokenBucket tb=map.get(clientId);
+// search
+        List<String> result=ac.search("jav",3);
 
-            if(tb.allow()){
-                System.out.println("Allowed ("+tb.tokens+" tokens left)");
-            }else{
-                System.out.println("Denied (Rate limit exceeded)");
-            }
+        for(String s:result){
+            System.out.println(s+" ("+ac.freq.get(s)+")");
         }
-
-        // status
-        void status(String clientId){
-            TokenBucket tb=map.get(clientId);
-            if(tb!=null){
-                System.out.println("Used: "+(tb.maxTokens-tb.tokens)+
-                        ", Limit: "+tb.maxTokens+
-                        ", Remaining: "+tb.tokens);
-            }
-        }
-    }
-
-    public static void main(String[] args)throws Exception{
-
-        RateLimiter rl=new RateLimiter();
-
-        String client="abc123";
-
-// simulate requests
-        for(int i=0;i<5;i++){
-            rl.check(client);
-            Thread.sleep(200);
-        }
-
-// simulate burst
-        for(int i=0;i<1005;i++){
-            rl.check(client);
-        }
-
-        rl.status(client);
     }
 }
