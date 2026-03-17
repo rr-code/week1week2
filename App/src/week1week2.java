@@ -2,76 +2,54 @@ import java.util.*;
 
 public class week1week2 {
 
-    // username -> userId
-    private Map<String, Integer> usernames = new HashMap<>();
+    // productId -> stock count
+    private Map<String, Integer> stock = new HashMap<>();
 
-    // username -> attempt frequency
-    private Map<String, Integer> attemptCount = new HashMap<>();
+    // productId -> waiting list (FIFO)
+    private Map<String, Queue<Integer>> waitingList = new HashMap<>();
 
-    // Register username
-    public boolean register(String username, int userId) {
-        if (usernames.containsKey(username)) {
-            return false;
-        }
-        usernames.put(username, userId);
-        return true;
+    // Add product with stock
+    public void addProduct(String productId, int quantity) {
+        stock.put(productId, quantity);
+        waitingList.put(productId, new LinkedList<>());
     }
 
-    // Check username availability
-    public boolean checkAvailability(String username) {
-        attemptCount.put(username, attemptCount.getOrDefault(username, 0) + 1);
-        return !usernames.containsKey(username);
+    // Check stock availability
+    public int checkStock(String productId) {
+        return stock.getOrDefault(productId, 0);
     }
 
-    // Suggest alternative usernames
-    public List<String> suggestAlternatives(String username) {
-        List<String> suggestions = new ArrayList<>();
-        int count = 1;
+    // Purchase item (thread-safe)
+    public synchronized String purchaseItem(String productId, int userId) {
 
-        while (suggestions.size() < 3) {
-            String newName = username + count;
-            if (!usernames.containsKey(newName)) {
-                suggestions.add(newName);
-            }
-            count++;
+        int currentStock = stock.getOrDefault(productId, 0);
+
+        if (currentStock > 0) {
+            stock.put(productId, currentStock - 1);
+            return "Success, " + (currentStock - 1) + " units remaining";
+        } else {
+            Queue<Integer> queue = waitingList.get(productId);
+            queue.add(userId);
+            return "Added to waiting list, position #" + queue.size();
         }
-
-        String alt = username.replace("_", ".");
-        if (!usernames.containsKey(alt) && suggestions.size() < 3) {
-            suggestions.add(alt);
-        }
-
-        return suggestions;
-    }
-
-    // Get most attempted username
-    public String getMostAttempted() {
-        String result = null;
-        int max = 0;
-
-        for (Map.Entry<String, Integer> entry : attemptCount.entrySet()) {
-            if (entry.getValue() > max) {
-                max = entry.getValue();
-                result = entry.getKey();
-            }
-        }
-
-        if (result == null) return null;
-        return result + " (" + max + " attempts)";
     }
 
     public static void main(String[] args) {
 
-        week1week2 checker = new week1week2();
+        week1week2 manager = new week1week2();
 
-        checker.register("john_doe", 1);
-        checker.register("admin", 2);
+        manager.addProduct("IPHONE15_256GB", 100);
 
-        System.out.println(checker.checkAvailability("john_doe"));   // false
-        System.out.println(checker.checkAvailability("jane_smith")); // true
+        System.out.println("Stock: " + manager.checkStock("IPHONE15_256GB"));
 
-        System.out.println(checker.suggestAlternatives("john_doe"));
+        System.out.println(manager.purchaseItem("IPHONE15_256GB", 12345));
+        System.out.println(manager.purchaseItem("IPHONE15_256GB", 67890));
 
-        System.out.println(checker.getMostAttempted());
+        // simulate out of stock
+        for(int i = 0; i < 100; i++){
+            manager.purchaseItem("IPHONE15_256GB", i);
+        }
+
+        System.out.println(manager.purchaseItem("IPHONE15_256GB", 99999));
     }
 }
