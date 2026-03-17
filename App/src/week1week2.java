@@ -1,55 +1,95 @@
 import java.util.*;
 
-public class week1week2 {
+class week1week2{
 
-    // productId -> stock count
-    private Map<String, Integer> stock = new HashMap<>();
-
-    // productId -> waiting list (FIFO)
-    private Map<String, Queue<Integer>> waitingList = new HashMap<>();
-
-    // Add product with stock
-    public void addProduct(String productId, int quantity) {
-        stock.put(productId, quantity);
-        waitingList.put(productId, new LinkedList<>());
-    }
-
-    // Check stock availability
-    public int checkStock(String productId) {
-        return stock.getOrDefault(productId, 0);
-    }
-
-    // Purchase item (thread-safe)
-    public synchronized String purchaseItem(String productId, int userId) {
-
-        int currentStock = stock.getOrDefault(productId, 0);
-
-        if (currentStock > 0) {
-            stock.put(productId, currentStock - 1);
-            return "Success, " + (currentStock - 1) + " units remaining";
-        } else {
-            Queue<Integer> queue = waitingList.get(productId);
-            queue.add(userId);
-            return "Added to waiting list, position #" + queue.size();
+    static class Entry{
+        String domain;
+        String ip;
+        long expiry;
+        Entry(String d,String i,long ttl){
+            domain=d;
+            ip=i;
+            expiry=System.currentTimeMillis()+ttl*1000;
         }
     }
 
-    public static void main(String[] args) {
+    static class DNSCache{
+        int capacity;
+        Map<String,Entry> map;
+        LinkedList<String> lru;
+        int hits=0,miss=0;
 
-        week1week2 manager = new week1week2();
-
-        manager.addProduct("IPHONE15_256GB", 100);
-
-        System.out.println("Stock: " + manager.checkStock("IPHONE15_256GB"));
-
-        System.out.println(manager.purchaseItem("IPHONE15_256GB", 12345));
-        System.out.println(manager.purchaseItem("IPHONE15_256GB", 67890));
-
-        // simulate out of stock
-        for(int i = 0; i < 100; i++){
-            manager.purchaseItem("IPHONE15_256GB", i);
+        DNSCache(int cap){
+            capacity=cap;
+            map=new HashMap<>();
+            lru=new LinkedList<>();
         }
 
-        System.out.println(manager.purchaseItem("IPHONE15_256GB", 99999));
+        String resolve(String domain){
+            long now=System.currentTimeMillis();
+            if(map.containsKey(domain)){
+                Entry e=map.get(domain);
+                if(e.expiry>now){
+                    hits++;
+                    lru.remove(domain);
+                    lru.addFirst(domain);
+                    return "Cache HIT -> "+e.ip;
+                }else{
+                    map.remove(domain);
+                    lru.remove(domain);
+                }
+            }
+            miss++;
+            String ip=queryUpstream(domain);
+            put(domain,ip,5); //TTL=5s example
+            return "Cache MISS -> "+ip;
+        }
+
+        void put(String domain,String ip,int ttl){
+            if(map.size()>=capacity){
+                String last=lru.removeLast();
+                map.remove(last);
+            }
+            Entry e=new Entry(domain,ip,ttl);
+            map.put(domain,e);
+            lru.addFirst(domain);
+        }
+
+        String queryUpstream(String domain){
+            Random r=new Random();
+            return "172.217.14."+r.nextInt(255);
+        }
+
+        void clean(){
+            long now=System.currentTimeMillis();
+            Iterator<String> it=lru.iterator();
+            while(it.hasNext()){
+                String d=it.next();
+                if(map.get(d).expiry<=now){
+                    it.remove();
+                    map.remove(d);
+                }
+            }
+        }
+
+        void stats(){
+            int total=hits+miss;
+            double rate=total==0?0:(hits*100.0/total);
+            System.out.println("Hit Rate: "+rate+"%");
+        }
+    }
+
+    public static void main(String[] args)throws Exception{
+        DNSCache cache=new DNSCache(3);
+
+        System.out.println(cache.resolve("google.com"));
+        Thread.sleep(1000);
+        System.out.println(cache.resolve("google.com"));
+
+        Thread.sleep(6000);
+        cache.clean();
+        System.out.println(cache.resolve("google.com"));
+
+        cache.stats();
     }
 }
